@@ -1,1 +1,34 @@
-/docs/
+/docs/requirements
+/CLAUDE.md
+/REPORT.md
+/answers.md
+# Default ignored files
+/shelf/
+/workspace.xml
+# Editor-based HTTP Client requests
+/httpRequests/
+# Datasource local storage ignored files
+/dataSources/
+/dataSources.local.xml
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Build output
+target/
+node_modules/
+web/dist/
+
+# Secrets — never commit
+deploy/.env
+.env
+*.pem
+
+# Experiments: large raw data stays local
+experiments/data/raw/*
+!experiments/data/raw/.gitkeep
+experiments/.venv/
+.ipynb_checkpoints/
+__pycache__/

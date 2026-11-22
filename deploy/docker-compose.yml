@@ -1,0 +1,146 @@
+# LTP stack.
+#   Core (caddy, control, postgres):          docker compose -f deploy/docker-compose.yml up -d
+#   + 2 workers + Demo Target (NFR-09 demo):  docker compose -f deploy/docker-compose.yml --profile demo up -d
+#   Worker-only host (KPI-3 experiments):     docker compose -f deploy/docker-compose.yml --profile worker up -d worker socket-proxy
+# Images are built locally from the repo; CD sets LTP_IMAGE_PREFIX=ghcr.io/<owner>/ltp to pull instead.
+name: ltp
+
+x-java-healthcheck: &java-healthcheck
+  interval: 10s
+  timeout: 3s
+  retries: 12
+  start_period: 30s
+
+services:
+  postgres:
+    image: postgres:18.7-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ltp}
+      POSTGRES_USER: ${POSTGRES_USER:-ltp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ltp}
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [backend]
+
+  control:
+    image: ${LTP_IMAGE_PREFIX:-ltp}/control:${LTP_VERSION:-dev}
+    build:
+      context: ..
+      args:
+        MODULE: control-service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      LTP_DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-ltp}
+      LTP_DB_USER: ${POSTGRES_USER:-ltp}
+      LTP_DB_PASSWORD: ${POSTGRES_PASSWORD:-ltp}
+      LTP_WORKER_REGISTRATION_TOKEN: ${LTP_WORKER_REGISTRATION_TOKEN:-change-me}
+      LTP_ADMIN_LOGIN: ${LTP_ADMIN_LOGIN:-admin}
+      LTP_ADMIN_PASSWORD: ${LTP_ADMIN_PASSWORD:-admin}
+      LTP_VERSION: ${LTP_VERSION:-dev}
+      LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs
+    healthcheck:
+      <<: *java-healthcheck
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health/readiness"]
+    deploy:
+      resources:
+        limits:
+          cpus: "2" # NFR-02 is measured on 2 vCPU
+    networks: [backend]
+
+  caddy:
+    image: ${LTP_IMAGE_PREFIX:-ltp}/web:${LTP_VERSION:-dev}
+    build:
+      context: ..
+      dockerfile: web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      control:
+        condition: service_healthy
+    environment:
+      LTP_DOMAIN: ${LTP_DOMAIN:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [backend]
+
+  # Workers never get the raw Docker socket (risk R5): only this restricted API
+  socket-proxy:
+    image: tecnativa/docker-socket-proxy:v0.5.0
+    profiles: [demo, worker]
+    restart: unless-stopped
+    environment:
+      CONTAINERS: 1
+      IMAGES: 1
+      POST: 1
+      VOLUMES: 1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [docker-api]
+
+  worker:
+    image: ${LTP_IMAGE_PREFIX:-ltp}/worker:${LTP_VERSION:-dev}
+    build:
+      context: ..
+      args:
+        MODULE: worker-service
+    profiles: [demo, worker]
+    restart: unless-stopped
+    depends_on:
+      - socket-proxy
+    environment:
+      LTP_CONTROL_URL: ${LTP_CONTROL_URL:-http://control:8080}
+      LTP_WORKER_REGISTRATION_TOKEN: ${LTP_WORKER_REGISTRATION_TOKEN:-change-me}
+      DOCKER_HOST: tcp://socket-proxy:2375
+      LTP_K6_IO_VOLUME: ltp-k6-io
+      LTP_K6_IO_DIR: /k6-io
+      LTP_K6_NETWORK: ltp-k6
+      LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs
+    volumes:
+      # Same named volume is mounted into every k6 container (host paths differ inside containers)
+      - k6-io:/k6-io
+    healthcheck:
+      <<: *java-healthcheck
+      test: ["CMD", "curl", "-fsS", "http://localhost:8081/actuator/health"]
+    deploy:
+      replicas: ${LTP_WORKER_REPLICAS:-2}
+    networks: [backend, docker-api]
+
+  demo-target:
+    image: ${LTP_IMAGE_PREFIX:-ltp}/demo-target:${LTP_VERSION:-dev}
+    build:
+      context: ..
+      args:
+        MODULE: demo-target
+    profiles: [demo]
+    restart: unless-stopped
+    healthcheck:
+      <<: *java-healthcheck
+      test: ["CMD", "curl", "-fsS", "http://localhost:8090/actuator/health"]
+    networks: [k6]
+
+networks:
+  backend:
+  docker-api:
+    internal: true
+  # k6 containers are attached here by the worker (never the host network)
+  k6:
+    name: ltp-k6
+
+volumes:
+  pgdata:
+  caddy-data:
+  caddy-config:
+  k6-io:
+    name: ltp-k6-io
