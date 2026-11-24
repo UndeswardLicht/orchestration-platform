@@ -1,0 +1,23 @@
+# LTP_DOMAIN=localhost → local self-signed TLS; a real domain → automatic HTTPS (Let's Encrypt)
+{$LTP_DOMAIN:localhost} {
+	encode zstd gzip
+
+	@control path /api/* /v3/api-docs* /swagger-ui* /actuator/health*
+	handle @control {
+		# flush_interval -1: no buffering, so SSE events reach the browser immediately (NFR-01)
+		reverse_proxy control:8080 {
+			flush_interval -1
+		}
+	}
+
+	# Workers talk to control:8080 on the internal network; never expose /internal/** publicly
+	handle /internal/* {
+		respond 404
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

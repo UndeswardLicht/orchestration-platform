@@ -1,0 +1,10 @@
+**/target/
+**/node_modules/
+web/dist/
+web/playwright-report/
+web/test-results/
+experiments/
+.git/
+.idea/
+**/*.iml
+deploy/.env

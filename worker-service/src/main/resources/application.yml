@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: worker-service
+  threads:
+    virtual:
+      enabled: true
+
+server:
+  port: 8081
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+
+ltp:
+  worker:
+    control-url: ${LTP_CONTROL_URL:http://localhost:8080}
+    registration-token: ${LTP_WORKER_REGISTRATION_TOKEN:change-me}
+    name: ${LTP_WORKER_NAME:${HOSTNAME:worker-local}}
+    # Filtered from the parent POM property k6.image
+    k6-image: ${LTP_K6_IMAGE:@k6.image@}
+    io-volume: ${LTP_K6_IO_VOLUME:ltp-k6-io}
+    io-dir: ${LTP_K6_IO_DIR:/k6-io}
+    k6-network: ${LTP_K6_NETWORK:ltp-k6}
+    heartbeat-interval: 2s

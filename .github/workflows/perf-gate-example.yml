@@ -1,0 +1,74 @@
+# Sample pipeline using the LTP quality gate (US-15, US-16, UC-02). T-07 moves the logic to scripts/ltp-gate.sh.
+# Needs secrets LTP_URL (e.g. https://ltp.example.com) and LTP_API_TOKEN (ltp_…, US-24).
+# Policy: PASS → 0 · WARN → 0 + warning · FAIL/ERROR → 1 · NO_BASELINE → input · timeout (duration + 5 min) → 1
+name: Performance gate (example)
+
+on:
+  workflow_dispatch:
+    inputs:
+      scenario-id:
+        description: Scenario id
+        required: true
+      scenario-version:
+        description: Scenario version
+        required: true
+      target-url:
+        description: Verified target URL
+        required: true
+      on-no-baseline:
+        description: Result when the scenario has no baseline
+        type: choice
+        options: [pass, fail]
+        default: pass
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    env:
+      LTP_URL: ${{ secrets.LTP_URL }}
+      LTP_API_TOKEN: ${{ secrets.LTP_API_TOKEN }}
+      DURATION_SEC: 120
+    steps:
+      - name: Start run
+        id: start
+        # Inputs go through env, never inlined into the script (prevents shell injection)
+        env:
+          SCENARIO_ID: ${{ inputs.scenario-id }}
+          SCENARIO_VERSION: ${{ inputs.scenario-version }}
+          TARGET_URL: ${{ inputs.target-url }}
+        run: |
+          body=$(jq -n \
+            --argjson scenarioId "$SCENARIO_ID" \
+            --argjson scenarioVersion "$SCENARIO_VERSION" \
+            --arg targetUrl "$TARGET_URL" \
+            --argjson durationSec "$DURATION_SEC" \
+            '{scenarioId: $scenarioId, scenarioVersion: $scenarioVersion, targetUrl: $targetUrl,
+              profile: {type: "constant-vus", vus: 200}, durationSec: $durationSec, workers: 4}')
+          run_id=$(curl -fsS -X POST "$LTP_URL/api/v1/runs" \
+            -H "Authorization: Bearer $LTP_API_TOKEN" -H "Content-Type: application/json" \
+            -d "$body" | jq -r .runId)
+          echo "run-id=$run_id" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for verdict
+        env:
+          RUN_ID: ${{ steps.start.outputs.run-id }}
+          ON_NO_BASELINE: ${{ inputs.on-no-baseline }}
+        run: |
+          deadline=$(( $(date +%s) + DURATION_SEC + 300 ))
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            resp=$(curl -fsS "$LTP_URL/api/v1/runs/$RUN_ID/gate" -H "Authorization: Bearer $LTP_API_TOKEN")
+            gate=$(echo "$resp" | jq -r .gate)
+            case "$gate" in
+              PENDING) sleep 5 ;;
+              PASS) echo "Gate PASS"; exit 0 ;;
+              WARN) echo "::warning::Gate WARN: $(echo "$resp" | jq -c .violatedRules)"; exit 0 ;;
+              NO_BASELINE)
+                echo "::warning::No baseline for this scenario"
+                [ "$ON_NO_BASELINE" = pass ] && exit 0 || exit 1 ;;
+              *) echo "::error::Gate $gate: $(echo "$resp" | jq -c .violatedRules)"; exit 1 ;;
+            esac
+          done
+          echo "::error::Gate timed out"; exit 1
