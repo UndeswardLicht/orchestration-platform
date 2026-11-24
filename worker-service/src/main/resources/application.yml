@@ -25,4 +25,7 @@ ltp:
     io-volume: ${LTP_K6_IO_VOLUME:ltp-k6-io}
     io-dir: ${LTP_K6_IO_DIR:/k6-io}
     k6-network: ${LTP_K6_NETWORK:ltp-k6}
+    # NFR-05 defaults; later taken from the Control Service settings (US-22)
+    k6-cpus: ${LTP_K6_CPUS:1.0}
+    k6-memory-mb: ${LTP_K6_MEMORY_MB:512}
     heartbeat-interval: 2s

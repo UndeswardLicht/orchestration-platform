@@ -19,4 +19,11 @@ class WorkerServiceApplicationTests {
         assertThat(properties.k6Image()).matches("grafana/k6:\\d+\\.\\d+\\.\\d+");
         assertThat(properties.heartbeatInterval()).isEqualTo(Duration.ofSeconds(2));
     }
+
+    @Test
+    void limitsK6ContainersTo1CpuAnd512MbByDefault() {
+        // NFR-05
+        assertThat(properties.k6Cpus()).isEqualTo(1.0);
+        assertThat(properties.k6MemoryMb()).isEqualTo(512);
+    }
 }
