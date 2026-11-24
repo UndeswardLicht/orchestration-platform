@@ -19,6 +19,7 @@ They feed the "design decisions" and "alternatives considered" parts of the thes
 | [0005](0005-typescript-5-9.md) | TypeScript 5.9 instead of 7 | Accepted | 2026-11-22 |
 | [0006](0006-ci-runs-mvnw-through-sh.md) | CI runs the Maven wrapper through `sh` | Accepted | 2026-11-21 |
 | [0007](0007-k6-runner-and-per-second-digests.md) | k6 runner and per-second digests (SPIKE-1 results) | Accepted | 2026-11-22 |
+| [0008](0008-license-gpl-3.md) | License the code under GPL-3.0-or-later | Accepted | 2026-11-24 |
 
 ## Template
 
