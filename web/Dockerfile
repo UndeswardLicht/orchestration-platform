@@ -10,5 +10,7 @@ COPY web/ ./
 RUN npm run build
 
 FROM caddy:2.11.9-alpine
+LABEL org.opencontainers.image.licenses="GPL-3.0-or-later" \
+      org.opencontainers.image.source="https://github.com/UndeswardLicht/orchestration-platform"
 COPY deploy/Caddyfile /etc/caddy/Caddyfile
 COPY --from=build /web/dist /srv

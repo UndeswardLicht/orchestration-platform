@@ -19,6 +19,8 @@ RUN --mount=type=cache,target=/root/.m2 \
 
 FROM eclipse-temurin:25.0.5.1_2-jre-noble
 ARG MODULE
+LABEL org.opencontainers.image.licenses="GPL-3.0-or-later" \
+      org.opencontainers.image.source="https://github.com/UndeswardLicht/orchestration-platform"
 # curl is used by the Compose health checks; the Temurin JRE image does not ship it
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \

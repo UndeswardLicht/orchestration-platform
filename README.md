@@ -39,3 +39,15 @@ UI: https://localhost · API docs: https://localhost/swagger-ui.html
 
 For development, run the Control Service from the IDE (PostgreSQL on `localhost:5432`) and
 `cd web && npm run dev`; Vite proxies `/api` to `localhost:8080`.
+
+## License
+
+Copyright (C) 2026 UndeswardLicht
+
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU
+General Public License as published by the Free Software Foundation, either version 3 of the License,
+or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY; see [`LICENSE`](LICENSE)
+for the full text.
+
+Third-party components keep their own licences. The worker runs the unmodified `grafana/k6` image
+(AGPL-3.0) as a separate container; it is not linked into or distributed with this code.
