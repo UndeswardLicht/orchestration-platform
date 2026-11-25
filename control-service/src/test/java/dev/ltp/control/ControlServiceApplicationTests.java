@@ -6,19 +6,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
-/**
- * Boots the whole Control Service against a real PostgreSQL (Flyway runs on start).
- *
- * <p>Docker is required: without it the test fails instead of being skipped (ADR-0004).
- */
-@SpringBootTest
-@AutoConfigureMockMvc
-@Import(TestcontainersConfiguration.class)
+/** Boots the whole Control Service against a real PostgreSQL (ADR-0004: Docker is required). */
+@IntegrationTest
 class ControlServiceApplicationTests {
 
     @Autowired

@@ -38,12 +38,12 @@ springdoc:
 
 ltp:
   version: ${LTP_VERSION:dev}
-  limits:
-    # NFR-06 / NFR-05 defaults; persisted in the settings table from T-03 on
-    max-rps: 1000
-    max-duration-sec: 1800
-    k6-cpu: 1.0
-    k6-mem-mb: 512
+  # Limits (max RPS, max duration, k6 CPU/RAM, warm-up) live in the settings table (V1 migration).
+  admin:
+    # First admin, created on start only if no admin exists (AdminSeeder). The password is required
+    # until then; an empty value stops the start with a message.
+    login: ${LTP_ADMIN_LOGIN:admin}
+    password: ${LTP_ADMIN_PASSWORD:}
   worker:
     registration-token: ${LTP_WORKER_REGISTRATION_TOKEN:change-me}
     heartbeat-timeout: 15s
