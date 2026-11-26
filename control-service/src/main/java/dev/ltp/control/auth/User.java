@@ -84,4 +84,9 @@ public class User {
     public boolean isDeleted() {
         return deletedAt != null;
     }
+
+    /** Role changes go through {@link UserService#changeRole}, which also ends the user's sessions. */
+    void changeRole(Role newRole) {
+        this.role = Objects.requireNonNull(newRole);
+    }
 }

@@ -19,6 +19,17 @@ spring:
 server:
   port: 8080
   shutdown: graceful
+  servlet:
+    session:
+      # Sign-out after this much inactivity (US-23); every request resets the clock
+      timeout: ${LTP_SESSION_TIMEOUT:8h}
+      cookie:
+        name: LTP_SESSION
+        http-only: true
+        same-site: lax
+        # Only over HTTPS. Browsers also accept Secure cookies on http://localhost; set
+        # LTP_SECURE_COOKIES=false only for plain-HTTP setups on another host name.
+        secure: ${LTP_SECURE_COOKIES:true}
 
 management:
   endpoints:
@@ -35,6 +46,9 @@ springdoc:
     version: openapi_3_0
   swagger-ui:
     path: /swagger-ui.html
+    # "Try it out" sends the XSRF-TOKEN cookie value in the X-XSRF-TOKEN header
+    csrf:
+      enabled: true
 
 ltp:
   version: ${LTP_VERSION:dev}
@@ -44,6 +58,9 @@ ltp:
     # until then; an empty value stops the start with a message.
     login: ${LTP_ADMIN_LOGIN:admin}
     password: ${LTP_ADMIN_PASSWORD:}
+  security:
+    # Same value as server.servlet.session.cookie.secure, applied to the CSRF cookie
+    secure-cookies: ${LTP_SECURE_COOKIES:true}
   worker:
     registration-token: ${LTP_WORKER_REGISTRATION_TOKEN:change-me}
     heartbeat-timeout: 15s

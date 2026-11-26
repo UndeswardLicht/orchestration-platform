@@ -12,12 +12,19 @@ import org.springframework.context.annotation.Import;
  * The whole Control Service against a real PostgreSQL (Flyway runs on start). All integration tests use
  * this one annotation, so Spring reuses a single context and a single database container.
  *
+ * <p>The server listens on a random port, so tests can use MockMvc and real HTTP (needed to check the
+ * cookie attributes Tomcat sets) against the same context.
+ *
  * <p>Docker is required: without it the tests fail instead of being skipped (ADR-0004).
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
-@SpringBootTest(properties = {"ltp.admin.login=" + IntegrationTest.ADMIN_LOGIN,
-    "ltp.admin.password=" + IntegrationTest.ADMIN_PASSWORD})
+@SpringBootTest(
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = {
+            "ltp.admin.login=" + IntegrationTest.ADMIN_LOGIN,
+            "ltp.admin.password=" + IntegrationTest.ADMIN_PASSWORD
+        })
 @AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)
 public @interface IntegrationTest {
