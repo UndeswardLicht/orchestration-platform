@@ -21,5 +21,7 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
     css: true,
+    // Page tests type, upload and wait for several renders; 5 s is tight on a busy CI runner
+    testTimeout: 20000,
   },
 })

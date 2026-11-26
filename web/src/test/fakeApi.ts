@@ -7,6 +7,8 @@ type Handler = (request: Request) => Response | Promise<Response>
 export type FakeRoutes = Record<string, Handler>
 
 export const ADMIN: CurrentUser = { id: 1, login: 'admin', role: 'ADMIN' }
+export const DEVELOPER: CurrentUser = { id: 2, login: 'dana', role: 'DEVELOPER' }
+export const VIEWER: CurrentUser = { id: 3, login: 'vera', role: 'VIEWER' }
 
 export const CSRF_TOKEN = 'test-csrf-token'
 

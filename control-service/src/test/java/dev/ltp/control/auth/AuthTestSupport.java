@@ -10,16 +10,16 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 /** Signs in through the real login endpoint and returns the session for later requests. */
-final class AuthTestSupport {
+public final class AuthTestSupport {
 
     /** Logins of users created by tests start with this; they are deleted after each test. */
-    static final String TEST_LOGIN_PREFIX = "it-";
+    public static final String TEST_LOGIN_PREFIX = "it-";
 
-    static final String PASSWORD = "a-long-test-password";
+    public static final String PASSWORD = "a-long-test-password";
 
     private AuthTestSupport() {}
 
-    static MockHttpSession login(MockMvc mvc, String login, String password) throws Exception {
+    public static MockHttpSession login(MockMvc mvc, String login, String password) throws Exception {
         MvcResult result = mvc.perform(post("/api/v1/auth/login")
                         .with(browserCsrf())
                         .contentType(MediaType.APPLICATION_JSON)

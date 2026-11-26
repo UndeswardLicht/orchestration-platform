@@ -28,6 +28,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/scenarios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List scenarios
+         * @description Every scenario with its newest version number, ordered by name. Scripts are left out.
+         */
+        get: operations["list_1"];
+        put?: never;
+        /**
+         * Create a scenario
+         * @description Saves the scenario and version 1 of its k6 script. Needs the DEVELOPER or ADMIN role.
+         */
+        post: operations["create_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/logout": {
         parameters: {
             query?: never;
@@ -86,6 +110,26 @@ export interface paths {
          * @description The user's open sessions end at once, so the new role applies on the next sign-in. The last admin cannot lose the ADMIN role.
          */
         patch: operations["changeRole"];
+        trace?: never;
+    };
+    "/api/v1/scenarios/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a scenario
+         * @description The scenario with its newest version, script included.
+         */
+        get: operations["get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/auth/me": {
@@ -187,6 +231,58 @@ export interface components {
                 [key: string]: Record<string, never>;
             };
         };
+        /** @description A new scenario and the script of its version 1 */
+        CreateScenarioRequest: {
+            /**
+             * @description Unique ignoring case; surrounding spaces are removed
+             * @example Checkout API
+             */
+            name: string;
+            /** @example Browse, add to cart, pay */
+            description?: string | null;
+            /**
+             * @description k6 script (JavaScript), stored exactly as sent; at most 1 MB in UTF-8. The run's target URL is passed to it as the BASE_URL environment variable.
+             * @example import http from 'k6/http';
+             *     export default function () {
+             *       http.get(__ENV.BASE_URL + '/');
+             *     }
+             */
+            script: string;
+        };
+        /** @description A scenario in the list, without its script */
+        ScenarioSummary: {
+            /**
+             * Format: int64
+             * @example 12
+             */
+            id: number;
+            /** @example Checkout API */
+            name: string;
+            /** @example Browse, add to cart, pay */
+            description?: string | null;
+            /**
+             * Format: int32
+             * @description Number of the newest version
+             * @example 1
+             */
+            latestVersion: number;
+            /**
+             * @description Login of the user who created the scenario
+             * @example dana
+             */
+            createdBy: string;
+            /**
+             * Format: date-time
+             * @example 2026-11-26T09:30:00Z
+             */
+            createdAt: string;
+            /**
+             * Format: date-time
+             * @description When the newest version was saved
+             * @example 2026-11-26T09:30:00Z
+             */
+            updatedAt: string;
+        };
         /** @description Login and password */
         LoginRequest: {
             /** @example admin */
@@ -214,10 +310,63 @@ export interface components {
              */
             role: "ADMIN" | "DEVELOPER" | "VIEWER";
         };
+        /** @description A scenario with its newest version */
+        ScenarioDetails: {
+            /**
+             * Format: int64
+             * @example 12
+             */
+            id: number;
+            /** @example Checkout API */
+            name: string;
+            /** @example Browse, add to cart, pay */
+            description?: string | null;
+            /** @example dana */
+            createdBy: string;
+            /**
+             * Format: date-time
+             * @example 2026-11-26T09:30:00Z
+             */
+            createdAt: string;
+            latestVersion: components["schemas"]["ScenarioVersionDetails"];
+        };
+        /** @description One immutable version of a scenario's script */
+        ScenarioVersionDetails: {
+            /**
+             * Format: int64
+             * @description Id of the version (runs reference it)
+             * @example 31
+             */
+            id: number;
+            /**
+             * Format: int32
+             * @example 1
+             */
+            version: number;
+            /**
+             * @example import http from 'k6/http';
+             *     export default function () {
+             *       http.get(__ENV.BASE_URL + '/');
+             *     }
+             */
+            script: string;
+            /**
+             * @description SHA-256 of the script (UTF-8), lower-case hex
+             * @example b5af96aa2912f2e473d65d41c193309718c093667197a98c99048d97b482a240
+             */
+            sha256: string;
+            /** @example dana */
+            createdBy: string;
+            /**
+             * Format: date-time
+             * @example 2026-11-26T09:30:00Z
+             */
+            createdAt: string;
+        };
         CsrfToken: {
+            headerName?: string;
             parameterName?: string;
             token?: string;
-            headerName?: string;
         };
     };
     responses: never;
@@ -348,6 +497,134 @@ export interface operations {
             };
         };
     };
+    list_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Scenarios */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example [
+                     *       {
+                     *         "id": 12,
+                     *         "name": "Checkout API",
+                     *         "description": "Browse, add to cart, pay",
+                     *         "latestVersion": 1,
+                     *         "createdBy": "dana",
+                     *         "createdAt": "2026-11-26T09:30:00Z",
+                     *         "updatedAt": "2026-11-26T09:30:00Z"
+                     *       }
+                     *     ]
+                     */
+                    "*/*": components["schemas"]["ScenarioSummary"][];
+                };
+            };
+        };
+    };
+    create_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateScenarioRequest"];
+            };
+        };
+        responses: {
+            /** @description Created with version 1 */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "id": 12,
+                     *       "name": "Checkout API",
+                     *       "description": "Browse, add to cart, pay",
+                     *       "latestVersion": 1,
+                     *       "createdBy": "dana",
+                     *       "createdAt": "2026-11-26T09:30:00Z",
+                     *       "updatedAt": "2026-11-26T09:30:00Z"
+                     *     }
+                     */
+                    "*/*": components["schemas"]["ScenarioSummary"];
+                };
+            };
+            /** @description Name or script is empty, too long or too large; `errors` names the field */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "type": "about:blank",
+                     *       "title": "Bad Request",
+                     *       "status": 400,
+                     *       "detail": "Validation failed",
+                     *       "instance": "/api/v1/scenarios",
+                     *       "errors": [
+                     *         {
+                     *           "field": "script",
+                     *           "message": "must not be blank"
+                     *         }
+                     *       ]
+                     *     }
+                     */
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Viewers cannot create scenarios */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "type": "about:blank",
+                     *       "title": "Forbidden",
+                     *       "status": 403,
+                     *       "detail": "Your role does not allow this action.",
+                     *       "instance": "/api/v1/scenarios"
+                     *     }
+                     */
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description A scenario with this name exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "type": "about:blank",
+                     *       "title": "Conflict",
+                     *       "status": 409,
+                     *       "detail": "A scenario named 'Checkout API' already exists",
+                     *       "instance": "/api/v1/scenarios"
+                     *     }
+                     */
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
     logout: {
         parameters: {
             query?: never;
@@ -472,6 +749,67 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Scenario id
+                 * @example 12
+                 */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The scenario */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "id": 12,
+                     *       "name": "Checkout API",
+                     *       "description": "Browse, add to cart, pay",
+                     *       "createdBy": "dana",
+                     *       "createdAt": "2026-11-26T09:30:00Z",
+                     *       "latestVersion": {
+                     *         "id": 31,
+                     *         "version": 1,
+                     *         "script": "import http from 'k6/http';\nexport default function () {\n  http.get(__ENV.BASE_URL + '/');\n}\n",
+                     *         "sha256": "b5af96aa2912f2e473d65d41c193309718c093667197a98c99048d97b482a240",
+                     *         "createdBy": "dana",
+                     *         "createdAt": "2026-11-26T09:30:00Z"
+                     *       }
+                     *     }
+                     */
+                    "*/*": components["schemas"]["ScenarioDetails"];
+                };
+            };
+            /** @description No such scenario */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "type": "about:blank",
+                     *       "title": "Not Found",
+                     *       "status": 404,
+                     *       "detail": "No scenario with id 12",
+                     *       "instance": "/api/v1/scenarios/12"
+                     *     }
+                     */
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
             };
         };
     };
