@@ -45,3 +45,6 @@ Object.defineProperty(document, 'fonts', {
   configurable: true,
   value: { addEventListener: () => {}, removeEventListener: () => {}, ready: Promise.resolve() },
 })
+
+// Mantine's Select scrolls the chosen option into view; jsdom does not implement scrolling
+Element.prototype.scrollIntoView = () => {}

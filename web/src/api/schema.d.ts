@@ -52,6 +52,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/scenarios/{id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List versions
+         * @description Every version of the scenario, newest first, without scripts.
+         */
+        get: operations["listVersions"];
+        put?: never;
+        /**
+         * Save a new version
+         * @description Saves a changed script as the next version; earlier versions never change. A script identical to the latest version (same SHA-256) saves nothing: the answer is 200 with `created: false` and the latest version. Needs the DEVELOPER or ADMIN role.
+         */
+        post: operations["saveVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/logout": {
         parameters: {
             query?: never;
@@ -124,6 +148,26 @@ export interface paths {
          * @description The scenario with its newest version, script included.
          */
         get: operations["get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/scenarios/{id}/versions/{version}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a version
+         * @description One version with its script, by its number (1, 2, ...). Versions never change.
+         */
+        get: operations["getVersion"];
         put?: never;
         post?: never;
         delete?: never;
@@ -283,6 +327,65 @@ export interface components {
              */
             updatedAt: string;
         };
+        /** @description A changed script, and the version it was edited from */
+        SaveVersionRequest: {
+            /**
+             * @description k6 script (JavaScript), stored exactly as sent; at most 1 MB in UTF-8
+             * @example import http from 'k6/http';
+             *     export default function () {
+             *       http.get(__ENV.BASE_URL + '/cart');
+             *     }
+             */
+            script: string;
+            /**
+             * Format: int32
+             * @description The version the user edited. If a newer version exists, the save is refused with 409, so nobody overwrites a colleague's change unseen.
+             * @example 1
+             */
+            basedOnVersion: number;
+        };
+        /** @description Result of saving a script */
+        SavedVersion: {
+            /**
+             * @description true: a new version was saved; false: the script equals the latest version, nothing was saved and `version` is that latest version
+             * @example true
+             */
+            created: boolean;
+            version: components["schemas"]["ScenarioVersionDetails"];
+        };
+        /** @description One immutable version of a scenario's script */
+        ScenarioVersionDetails: {
+            /**
+             * Format: int64
+             * @description Id of the version (runs reference it)
+             * @example 31
+             */
+            id: number;
+            /**
+             * Format: int32
+             * @example 1
+             */
+            version: number;
+            /**
+             * @example import http from 'k6/http';
+             *     export default function () {
+             *       http.get(__ENV.BASE_URL + '/');
+             *     }
+             */
+            script: string;
+            /**
+             * @description SHA-256 of the script (UTF-8), lower-case hex
+             * @example b5af96aa2912f2e473d65d41c193309718c093667197a98c99048d97b482a240
+             */
+            sha256: string;
+            /** @example dana */
+            createdBy: string;
+            /**
+             * Format: date-time
+             * @example 2026-11-26T09:30:00Z
+             */
+            createdAt: string;
+        };
         /** @description Login and password */
         LoginRequest: {
             /** @example admin */
@@ -330,26 +433,19 @@ export interface components {
             createdAt: string;
             latestVersion: components["schemas"]["ScenarioVersionDetails"];
         };
-        /** @description One immutable version of a scenario's script */
-        ScenarioVersionDetails: {
+        /** @description A version of a scenario, without its script */
+        ScenarioVersionSummary: {
             /**
              * Format: int64
              * @description Id of the version (runs reference it)
-             * @example 31
+             * @example 32
              */
             id: number;
             /**
              * Format: int32
-             * @example 1
+             * @example 2
              */
             version: number;
-            /**
-             * @example import http from 'k6/http';
-             *     export default function () {
-             *       http.get(__ENV.BASE_URL + '/');
-             *     }
-             */
-            script: string;
             /**
              * @description SHA-256 of the script (UTF-8), lower-case hex
              * @example b5af96aa2912f2e473d65d41c193309718c093667197a98c99048d97b482a240
@@ -359,14 +455,14 @@ export interface components {
             createdBy: string;
             /**
              * Format: date-time
-             * @example 2026-11-26T09:30:00Z
+             * @example 2026-11-27T10:15:00Z
              */
             createdAt: string;
         };
         CsrfToken: {
             headerName?: string;
-            parameterName?: string;
             token?: string;
+            parameterName?: string;
         };
     };
     responses: never;
@@ -625,6 +721,211 @@ export interface operations {
             };
         };
     };
+    listVersions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Scenario id
+                 * @example 12
+                 */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Versions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example [
+                     *       {
+                     *         "id": 32,
+                     *         "version": 2,
+                     *         "sha256": "ef8e567b99d3f4406f705cf9b59d5abc716d50c7abc4a0a7b603bbafeec1c32e",
+                     *         "createdBy": "dana",
+                     *         "createdAt": "2026-11-27T10:15:00Z"
+                     *       },
+                     *       {
+                     *         "id": 31,
+                     *         "version": 1,
+                     *         "sha256": "b5af96aa2912f2e473d65d41c193309718c093667197a98c99048d97b482a240",
+                     *         "createdBy": "dana",
+                     *         "createdAt": "2026-11-26T09:30:00Z"
+                     *       }
+                     *     ]
+                     */
+                    "*/*": components["schemas"]["ScenarioVersionSummary"][];
+                };
+            };
+            /** @description No such scenario */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "type": "about:blank",
+                     *       "title": "Not Found",
+                     *       "status": 404,
+                     *       "detail": "No scenario with id 12",
+                     *       "instance": "/api/v1/scenarios/12"
+                     *     }
+                     */
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    saveVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Scenario id
+                 * @example 12
+                 */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveVersionRequest"];
+            };
+        };
+        responses: {
+            /** @description Identical to the latest version; nothing saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "created": false,
+                     *       "version": {
+                     *         "id": 32,
+                     *         "version": 2,
+                     *         "script": "import http from 'k6/http';\nexport default function () {\n  http.get(__ENV.BASE_URL + '/cart');\n}\n",
+                     *         "sha256": "ef8e567b99d3f4406f705cf9b59d5abc716d50c7abc4a0a7b603bbafeec1c32e",
+                     *         "createdBy": "dana",
+                     *         "createdAt": "2026-11-27T10:15:00Z"
+                     *       }
+                     *     }
+                     */
+                    "*/*": components["schemas"]["SavedVersion"];
+                };
+            };
+            /** @description Saved as a new version */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "created": true,
+                     *       "version": {
+                     *         "id": 32,
+                     *         "version": 2,
+                     *         "script": "import http from 'k6/http';\nexport default function () {\n  http.get(__ENV.BASE_URL + '/cart');\n}\n",
+                     *         "sha256": "ef8e567b99d3f4406f705cf9b59d5abc716d50c7abc4a0a7b603bbafeec1c32e",
+                     *         "createdBy": "dana",
+                     *         "createdAt": "2026-11-27T10:15:00Z"
+                     *       }
+                     *     }
+                     */
+                    "*/*": components["schemas"]["SavedVersion"];
+                };
+            };
+            /** @description Script empty or larger than 1 MB, or no `basedOnVersion`; `errors` names the field */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "type": "about:blank",
+                     *       "title": "Bad Request",
+                     *       "status": 400,
+                     *       "detail": "Validation failed",
+                     *       "instance": "/api/v1/scenarios",
+                     *       "errors": [
+                     *         {
+                     *           "field": "script",
+                     *           "message": "must not be blank"
+                     *         }
+                     *       ]
+                     *     }
+                     */
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Viewers cannot save versions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "type": "about:blank",
+                     *       "title": "Forbidden",
+                     *       "status": 403,
+                     *       "detail": "Your role does not allow this action.",
+                     *       "instance": "/api/v1/scenarios"
+                     *     }
+                     */
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description No such scenario */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "type": "about:blank",
+                     *       "title": "Not Found",
+                     *       "status": 404,
+                     *       "detail": "No scenario with id 12",
+                     *       "instance": "/api/v1/scenarios/12"
+                     *     }
+                     */
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description A newer version than `basedOnVersion` exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "type": "about:blank",
+                     *       "title": "Conflict",
+                     *       "status": 409,
+                     *       "detail": "Your changes are based on version 1, but version 2 is the latest. Load it and apply your changes again.",
+                     *       "instance": "/api/v1/scenarios/12/versions"
+                     *     }
+                     */
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
     logout: {
         parameters: {
             query?: never;
@@ -806,6 +1107,65 @@ export interface operations {
                      *       "status": 404,
                      *       "detail": "No scenario with id 12",
                      *       "instance": "/api/v1/scenarios/12"
+                     *     }
+                     */
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    getVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Scenario id
+                 * @example 12
+                 */
+                id: number;
+                /**
+                 * @description Version number
+                 * @example 2
+                 */
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The version */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "id": 32,
+                     *       "version": 2,
+                     *       "script": "import http from 'k6/http';\nexport default function () {\n  http.get(__ENV.BASE_URL + '/cart');\n}\n",
+                     *       "sha256": "ef8e567b99d3f4406f705cf9b59d5abc716d50c7abc4a0a7b603bbafeec1c32e",
+                     *       "createdBy": "dana",
+                     *       "createdAt": "2026-11-27T10:15:00Z"
+                     *     }
+                     */
+                    "*/*": components["schemas"]["ScenarioVersionDetails"];
+                };
+            };
+            /** @description No such scenario or version */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "type": "about:blank",
+                     *       "title": "Not Found",
+                     *       "status": 404,
+                     *       "detail": "Scenario 12 has no version 5",
+                     *       "instance": "/api/v1/scenarios/12/versions/5"
                      *     }
                      */
                     "application/problem+json": components["schemas"]["ProblemDetail"];
