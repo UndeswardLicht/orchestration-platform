@@ -2,8 +2,9 @@ import type { Page } from '@playwright/test'
 
 /**
  * Fake Control Service answers for the e2e tests. CI runs these tests against the Vite dev server only,
- * with no backend, so every `/api` call is answered here in the browser. Sign-in, `me`, sign-out and
- * scenarios behave like the real endpoints; any other call gets 404, so a missing fake shows up.
+ * with no backend, so every `/api` call is answered here in the browser. Sign-in, `me`, sign-out,
+ * scenarios and their versions behave like the real endpoints; any other call gets 404, so a missing
+ * fake shows up.
  */
 export const ADMIN = { id: 1, login: 'admin', role: 'ADMIN' }
 
@@ -12,24 +13,38 @@ export const FAKE_PASSWORD = 'correct-horse-battery-staple'
 export const SAMPLE_SCENARIO_SCRIPT =
   "import http from 'k6/http';\nexport default function () {\n  http.get(__ENV.BASE_URL + '/');\n}\n"
 
+interface FakeScenarioInput {
+  name: string
+  description?: string
+  /** Version 1, 2, ... in order. */
+  scripts: string[]
+}
+
 interface FakeScenario {
   id: number
   name: string
   description?: string
-  script: string
+  versions: { version: number; script: string }[]
 }
 
 interface FakeApiOptions {
   signedIn: boolean
   /** Scenarios that exist from the start. */
-  scenarios?: Omit<FakeScenario, 'id'>[]
+  scenarios?: FakeScenarioInput[]
 }
 
 const CREATED_AT = '2026-11-26T09:30:00Z'
 
+/** Not a real SHA-256; the UI only shows it. */
+const fakeHash = (script: string) => [...script].reduce((hash, c) => (hash * 31 + c.charCodeAt(0)) >>> 0, 7).toString(16).padStart(64, '0')
+
 export async function fakeApi(page: Page, baseURL: string, { signedIn, scenarios = [] }: FakeApiOptions) {
   let user: typeof ADMIN | null = signedIn ? ADMIN : null
-  const saved: FakeScenario[] = scenarios.map((scenario, index) => ({ id: index + 1, ...scenario }))
+  const saved: FakeScenario[] = scenarios.map(({ scripts, ...scenario }, index) => ({
+    id: index + 1,
+    ...scenario,
+    versions: scripts.map((script, v) => ({ version: v + 1, script })),
+  }))
   await page.context().addCookies([{ name: 'XSRF-TOKEN', value: 'e2e-csrf-token', url: baseURL }])
 
   const problem = (status: number, detail: string) => ({
@@ -37,11 +52,20 @@ export async function fakeApi(page: Page, baseURL: string, { signedIn, scenarios
     contentType: 'application/problem+json',
     body: JSON.stringify({ type: 'about:blank', status, detail }),
   })
+  const latestOf = (scenario: FakeScenario) => scenario.versions[scenario.versions.length - 1]
+  const version = (scenario: FakeScenario, v: { version: number; script: string }) => ({
+    id: scenario.id * 100 + v.version,
+    version: v.version,
+    script: v.script,
+    sha256: fakeHash(v.script),
+    createdBy: ADMIN.login,
+    createdAt: CREATED_AT,
+  })
   const summary = (scenario: FakeScenario) => ({
     id: scenario.id,
     name: scenario.name,
     description: scenario.description ?? null,
-    latestVersion: 1,
+    latestVersion: latestOf(scenario).version,
     createdBy: ADMIN.login,
     createdAt: CREATED_AT,
     updatedAt: CREATED_AT,
@@ -52,14 +76,7 @@ export async function fakeApi(page: Page, baseURL: string, { signedIn, scenarios
     description: scenario.description ?? null,
     createdBy: ADMIN.login,
     createdAt: CREATED_AT,
-    latestVersion: {
-      id: 100 + scenario.id,
-      version: 1,
-      script: scenario.script,
-      sha256: '0'.repeat(64),
-      createdBy: ADMIN.login,
-      createdAt: CREATED_AT,
-    },
+    latestVersion: version(scenario, latestOf(scenario)),
   })
 
   // Only the Control Service paths: a glob like **/api/** would also catch Vite's /src/api/*.ts modules
@@ -68,10 +85,39 @@ export async function fakeApi(page: Page, baseURL: string, { signedIn, scenarios
     const path = new URL(request.url()).pathname
     const key = `${request.method()} ${path}`
 
-    const scenarioId = /^GET \/api\/v1\/scenarios\/(\d+)$/.exec(key)?.[1]
-    if (scenarioId !== undefined) {
-      const found = saved.find((scenario) => scenario.id === Number(scenarioId))
-      return route.fulfill(found ? { json: details(found) } : problem(404, `No scenario with id ${scenarioId}`))
+    const match = /^(GET|POST) \/api\/v1\/scenarios\/(\d+)(\/versions(?:\/(\d+))?)?$/.exec(key)
+    if (match) {
+      const [, method, id, versionsPath, versionNumber] = match
+      const scenario = saved.find((candidate) => candidate.id === Number(id))
+      if (!scenario) return route.fulfill(problem(404, `No scenario with id ${id}`))
+      if (method === 'GET' && !versionsPath) return route.fulfill({ json: details(scenario) })
+      if (method === 'GET' && versionNumber === undefined) {
+        return route.fulfill({
+          json: [...scenario.versions].reverse().map((v) => {
+            const { script: _script, ...rest } = version(scenario, v)
+            return rest
+          }),
+        })
+      }
+      if (method === 'GET') {
+        const found = scenario.versions.find((v) => v.version === Number(versionNumber))
+        return route.fulfill(
+          found ? { json: version(scenario, found) } : problem(404, `Scenario ${id} has no version ${versionNumber}`),
+        )
+      }
+      if (method === 'POST' && versionNumber === undefined) {
+        const body = request.postDataJSON() as { script: string; basedOnVersion: number }
+        const latest = latestOf(scenario)
+        if (body.script === latest.script) return route.fulfill({ json: { created: false, version: version(scenario, latest) } })
+        if (body.basedOnVersion !== latest.version) {
+          return route.fulfill(
+            problem(409, `Your changes are based on version ${body.basedOnVersion}, but version ${latest.version} is the latest. Load it and apply your changes again.`),
+          )
+        }
+        const next = { version: latest.version + 1, script: body.script }
+        scenario.versions.push(next)
+        return route.fulfill({ status: 201, json: { created: true, version: version(scenario, next) } })
+      }
     }
 
     switch (key) {
@@ -93,11 +139,16 @@ export async function fakeApi(page: Page, baseURL: string, { signedIn, scenarios
       case 'GET /api/v1/scenarios':
         return route.fulfill({ json: [...saved].sort((a, b) => a.name.localeCompare(b.name)).map(summary) })
       case 'POST /api/v1/scenarios': {
-        const body = request.postDataJSON() as Omit<FakeScenario, 'id'>
+        const body = request.postDataJSON() as { name: string; description?: string; script: string }
         if (saved.some((scenario) => scenario.name.toLowerCase() === body.name.toLowerCase())) {
           return route.fulfill(problem(409, `A scenario named '${body.name}' already exists`))
         }
-        const created = { id: saved.length + 1, ...body }
+        const created: FakeScenario = {
+          id: saved.length + 1,
+          name: body.name,
+          description: body.description,
+          versions: [{ version: 1, script: body.script }],
+        }
         saved.push(created)
         return route.fulfill({ status: 201, json: summary(created) })
       }

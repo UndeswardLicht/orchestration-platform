@@ -5,6 +5,9 @@ import type { components } from '../api/schema'
 
 export type ScenarioSummary = components['schemas']['ScenarioSummary']
 export type ScenarioDetails = components['schemas']['ScenarioDetails']
+export type ScenarioVersion = components['schemas']['ScenarioVersionDetails']
+export type ScenarioVersionSummary = components['schemas']['ScenarioVersionSummary']
+export type SavedVersion = components['schemas']['SavedVersion']
 
 /** Same limits as the Control Service (US-01); checked here too, so the user learns it before sending. */
 export const MAX_NAME_LENGTH = 200
@@ -68,5 +71,59 @@ export function useCreateScenario() {
       return data
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: SCENARIOS_KEY }),
+  })
+}
+
+/** Every version of a scenario, newest first, without scripts (US-02). */
+export function useScenarioVersions(id: number) {
+  return useQuery({
+    queryKey: [...SCENARIOS_KEY, id, 'versions'],
+    queryFn: async () => {
+      const { data, error, response } = await api.GET('/api/v1/scenarios/{id}/versions', {
+        params: { path: { id } },
+      })
+      if (!data) fail(response, error, `Could not load the versions (HTTP ${response.status}).`)
+      return data
+    },
+    retry: retryOnce,
+  })
+}
+
+/** One version with its script. Versions never change, so a loaded one is never fetched again. */
+export function useScenarioVersion(id: number, version: number | undefined) {
+  return useQuery({
+    queryKey: [...SCENARIOS_KEY, id, 'versions', version],
+    queryFn: async () => {
+      const { data, error, response } = await api.GET('/api/v1/scenarios/{id}/versions/{version}', {
+        params: { path: { id, version: version! } },
+      })
+      if (!data) fail(response, error, `Could not load version ${version} (HTTP ${response.status}).`)
+      return data
+    },
+    enabled: version !== undefined,
+    staleTime: Infinity,
+    retry: retryOnce,
+  })
+}
+
+export interface VersionToSave {
+  script: string
+  /** The newest version the user had when starting to edit; the server refuses the save if it is outdated. */
+  basedOnVersion: number
+}
+
+export function useSaveVersion(id: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ script, basedOnVersion }: VersionToSave): Promise<SavedVersion> => {
+      const { data, error, response } = await api.POST('/api/v1/scenarios/{id}/versions', {
+        params: { path: { id } },
+        body: { script, basedOnVersion },
+      })
+      if (!data) fail(response, error, `Could not save the script (HTTP ${response.status}).`)
+      return data
+    },
+    // The scenario, its version list and the scenario list all show the newest version
+    onSettled: () => queryClient.invalidateQueries({ queryKey: SCENARIOS_KEY }),
   })
 }
