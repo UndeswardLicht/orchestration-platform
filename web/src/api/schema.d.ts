@@ -3,10 +3,223 @@
  * Do not make direct changes to the file.
  */
 
-export type paths = Record<string, never>;
+export interface paths {
+    "/api/v1/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List users
+         * @description All active accounts, ordered by login.
+         */
+        get: operations["list"];
+        put?: never;
+        /**
+         * Create a user
+         * @description Creates an account with an initial password and a role.
+         */
+        post: operations["create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign out
+         * @description Ends the session and deletes the session and CSRF cookies. Succeeds also when not signed in.
+         */
+        post: operations["logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign in
+         * @description Checks login and password. On success the response sets the HTTP-only session cookie LTP_SESSION and a new XSRF-TOKEN cookie.
+         */
+        post: operations["login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change a user's role
+         * @description The user's open sessions end at once, so the new role applies on the next sign-in. The last admin cannot lose the ADMIN role.
+         */
+        patch: operations["changeRole"];
+        trace?: never;
+    };
+    "/api/v1/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Who am I
+         * @description The signed-in user and role. The web app calls it after a page reload.
+         */
+        get: operations["me"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/csrf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Issue a CSRF token
+         * @description Sets the XSRF-TOKEN cookie. Send its value in the X-XSRF-TOKEN header with every POST, PATCH, PUT and DELETE, including the login itself. Call it once before signing in.
+         */
+        get: operations["csrf"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+}
 export type webhooks = Record<string, never>;
 export interface components {
-    schemas: never;
+    schemas: {
+        /** @description A new account */
+        CreateUserRequest: {
+            /**
+             * @description Letters, digits and . _ @ -; unique ignoring case
+             * @example dana
+             */
+            login: string;
+            /**
+             * Format: email
+             * @example dana@example.org
+             */
+            email?: string | null;
+            /**
+             * @description 12 to 72 characters (at most 72 bytes)
+             * @example a-long-initial-password
+             */
+            password: string;
+            /**
+             * @example DEVELOPER
+             * @enum {string}
+             */
+            role: "ADMIN" | "DEVELOPER" | "VIEWER";
+        };
+        /** @description An account */
+        UserResponse: {
+            /**
+             * Format: int64
+             * @example 2
+             */
+            id?: number;
+            /** @example dana */
+            login?: string;
+            /** @example dana@example.org */
+            email?: string | null;
+            /** @enum {string} */
+            role?: "ADMIN" | "DEVELOPER" | "VIEWER";
+            /**
+             * Format: date-time
+             * @example 2026-11-25T09:30:00Z
+             */
+            createdAt?: string;
+        };
+        ProblemDetail: {
+            /** Format: uri */
+            type?: string;
+            title?: string;
+            /** Format: int32 */
+            status?: number;
+            detail?: string;
+            /** Format: uri */
+            instance?: string;
+            properties?: {
+                [key: string]: Record<string, never>;
+            };
+        };
+        /** @description Login and password */
+        LoginRequest: {
+            /** @example admin */
+            login: string;
+            /** @example correct-horse-battery-staple */
+            password: string;
+        };
+        /** @description The signed-in user */
+        CurrentUserResponse: {
+            /**
+             * Format: int64
+             * @example 1
+             */
+            id?: number;
+            /** @example admin */
+            login?: string;
+            /** @enum {string} */
+            role?: "ADMIN" | "DEVELOPER" | "VIEWER";
+        };
+        /** @description The new role */
+        ChangeRoleRequest: {
+            /**
+             * @example VIEWER
+             * @enum {string}
+             */
+            role: "ADMIN" | "DEVELOPER" | "VIEWER";
+        };
+        CsrfToken: {
+            parameterName?: string;
+            token?: string;
+            headerName?: string;
+        };
+    };
     responses: never;
     parameters: never;
     requestBodies: never;
@@ -14,4 +227,306 @@ export interface components {
     pathItems: never;
 }
 export type $defs = Record<string, never>;
-export type operations = Record<string, never>;
+export interface operations {
+    list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Users */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example [
+                     *       {
+                     *         "id": 2,
+                     *         "login": "dana",
+                     *         "email": "dana@example.org",
+                     *         "role": "DEVELOPER",
+                     *         "createdAt": "2026-11-25T09:30:00Z"
+                     *       }
+                     *     ]
+                     */
+                    "*/*": components["schemas"]["UserResponse"][];
+                };
+            };
+            /** @description Not an admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "type": "about:blank",
+                     *       "title": "Forbidden",
+                     *       "status": 403,
+                     *       "detail": "Your role does not allow this action.",
+                     *       "instance": "/api/v1/users"
+                     *     }
+                     */
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateUserRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "id": 2,
+                     *       "login": "dana",
+                     *       "email": "dana@example.org",
+                     *       "role": "DEVELOPER",
+                     *       "createdAt": "2026-11-25T09:30:00Z"
+                     *     }
+                     */
+                    "*/*": components["schemas"]["UserResponse"];
+                };
+            };
+            /** @description A field is missing or invalid; `errors` names it */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "type": "about:blank",
+                     *       "title": "Bad Request",
+                     *       "status": 400,
+                     *       "detail": "Validation failed",
+                     *       "instance": "/api/v1/users",
+                     *       "errors": [
+                     *         {
+                     *           "field": "password",
+                     *           "message": "size must be between 12 and 72"
+                     *         }
+                     *       ]
+                     *     }
+                     */
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Not an admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The login is taken */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Signed out */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Signed in */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "id": 1,
+                     *       "login": "admin",
+                     *       "role": "ADMIN"
+                     *     }
+                     */
+                    "*/*": components["schemas"]["CurrentUserResponse"];
+                };
+            };
+            /** @description Wrong login or password (the same answer for both) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "type": "about:blank",
+                     *       "title": "Unauthorized",
+                     *       "status": 401,
+                     *       "detail": "Invalid login or password",
+                     *       "instance": "/api/v1/auth/login"
+                     *     }
+                     */
+                    "application/problem+json": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    changeRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description User id
+                 * @example 2
+                 */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description Role changed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "id": 2,
+                     *       "login": "dana",
+                     *       "email": "dana@example.org",
+                     *       "role": "DEVELOPER",
+                     *       "createdAt": "2026-11-25T09:30:00Z"
+                     *     }
+                     */
+                    "*/*": components["schemas"]["UserResponse"];
+                };
+            };
+            /** @description Not an admin */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such active user */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The user is the last admin */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    me: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Signed in */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "id": 1,
+                     *       "login": "admin",
+                     *       "role": "ADMIN"
+                     *     }
+                     */
+                    "*/*": components["schemas"]["CurrentUserResponse"];
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    csrf: {
+        parameters: {
+            query: {
+                token: components["schemas"]["CsrfToken"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cookie set */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+}
