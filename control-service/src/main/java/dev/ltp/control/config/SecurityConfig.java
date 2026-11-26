@@ -1,9 +1,14 @@
 package dev.ltp.control.config;
 
+import dev.ltp.common.protocol.WorkerProtocol;
+import dev.ltp.control.worker.WorkerAuthenticationFilter;
+import dev.ltp.control.worker.WorkerProperties;
+import dev.ltp.control.worker.WorkerRepository;
 import java.util.List;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
@@ -13,12 +18,14 @@ import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.core.session.SessionRegistryImpl;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
 import org.springframework.security.web.authentication.session.ChangeSessionIdAuthenticationStrategy;
 import org.springframework.security.web.authentication.session.CompositeSessionAuthenticationStrategy;
 import org.springframework.security.web.authentication.session.RegisterSessionAuthenticationStrategy;
@@ -41,7 +48,8 @@ import org.springframework.security.web.session.HttpSessionEventPublisher;
  * Endpoints tighten this with {@code @PreAuthorize} (for example ADMIN for user management), so a new
  * write endpoint without an annotation is still closed to Viewers.
  *
- * <p>Later: US-24 adds the API-token filter, US-06 a separate chain for {@code /internal/**}.
+ * <p>Workers use a separate, stateless chain for {@code /internal/**} (US-06): registration token or
+ * per-worker secret, no session, no CSRF. Later: US-24 adds the API-token filter.
  */
 @Configuration
 @EnableMethodSecurity
@@ -138,6 +146,41 @@ public class SecurityConfig {
                 new ChangeSessionIdAuthenticationStrategy(),
                 new RegisterSessionAuthenticationStrategy(sessionRegistry),
                 new CsrfAuthenticationStrategy(csrfTokenRepository)));
+    }
+
+    /**
+     * The worker protocol (US-06). Checked before {@link #apiSecurity}; a browser session never counts
+     * here. Every call answers 401 without valid worker credentials.
+     */
+    @Bean
+    @Order(1)
+    SecurityFilterChain internalSecurity(
+            HttpSecurity http, WorkerRepository workers, WorkerProperties workerProperties, ProblemResponseWriter problems)
+            throws Exception {
+        http.securityMatcher("/internal/**")
+                .securityContext(context -> context.securityContextRepository(new RequestAttributeSecurityContextRepository()))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                // No cookies are involved, so there is nothing for CSRF to protect
+                .csrf(csrf -> csrf.disable())
+                .logout(logout -> logout.disable())
+                .requestCache(cache -> cache.disable())
+                .addFilterBefore(new WorkerAuthenticationFilter(workers, workerProperties), AnonymousAuthenticationFilter.class)
+                .exceptionHandling(errors -> errors.authenticationEntryPoint((request, response, e) -> problems.write(
+                                request,
+                                response,
+                                HttpStatus.UNAUTHORIZED,
+                                WorkerAuthenticationFilter.REGISTRATION.matches(request)
+                                        ? "Missing or wrong registration token in the "
+                                                + WorkerProtocol.REGISTRATION_TOKEN_HEADER
+                                                + " header."
+                                        : "Missing, unknown or replaced worker secret. Register again."))
+                        .accessDeniedHandler((request, response, e) -> problems.write(
+                                request, response, HttpStatus.FORBIDDEN, "These credentials do not allow this call.")))
+                .authorizeHttpRequests(auth -> auth.requestMatchers(WorkerAuthenticationFilter.REGISTRATION)
+                        .hasRole(WorkerAuthenticationFilter.ROLE_REGISTRAR)
+                        .anyRequest()
+                        .hasRole(WorkerAuthenticationFilter.ROLE_WORKER));
+        return http.build();
     }
 
     @Bean

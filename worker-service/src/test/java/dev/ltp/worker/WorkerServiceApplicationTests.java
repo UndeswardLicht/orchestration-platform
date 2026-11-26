@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE, properties = "ltp.worker.agent.enabled=false")
 class WorkerServiceApplicationTests {
 
     @Autowired
@@ -18,6 +18,12 @@ class WorkerServiceApplicationTests {
     void bindsDefaultsWithPinnedK6Image() {
         assertThat(properties.k6Image()).matches("grafana/k6:\\d+\\.\\d+\\.\\d+");
         assertThat(properties.heartbeatInterval()).isEqualTo(Duration.ofSeconds(2));
+    }
+
+    @Test
+    void reportsItsVersionAndHostNameOnRegistration() {
+        assertThat(properties.version()).isNotBlank().doesNotContain("@");
+        assertThat(properties.name()).isNotBlank();
     }
 
     @Test

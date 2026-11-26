@@ -1,5 +1,6 @@
 package dev.ltp.control.config;
 
+import dev.ltp.common.protocol.WorkerProtocol;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
@@ -17,6 +18,12 @@ import org.springframework.context.annotation.Configuration;
 public class OpenApiConfig {
 
     static final String SESSION_SCHEME = "session";
+
+    /** Worker protocol (US-06): the shared token, sent only to register. */
+    public static final String REGISTRATION_TOKEN_SCHEME = "registrationToken";
+
+    /** Worker protocol (US-06): the per-worker secret from registration. */
+    public static final String WORKER_SECRET_SCHEME = "workerSecret";
 
     @Bean
     OpenAPI ltpOpenApi(@Value("${ltp.version:dev}") String version) {
@@ -36,7 +43,20 @@ public class OpenApiConfig {
                                         .type(SecurityScheme.Type.APIKEY)
                                         .in(SecurityScheme.In.COOKIE)
                                         .name(SecurityConfig.SESSION_COOKIE)
-                                        .description("HTTP-only session cookie set by POST /api/v1/auth/login")))
+                                        .description("HTTP-only session cookie set by POST /api/v1/auth/login"))
+                        .addSecuritySchemes(
+                                REGISTRATION_TOKEN_SCHEME,
+                                new SecurityScheme()
+                                        .type(SecurityScheme.Type.APIKEY)
+                                        .in(SecurityScheme.In.HEADER)
+                                        .name(WorkerProtocol.REGISTRATION_TOKEN_HEADER)
+                                        .description("Shared worker registration token (LTP_WORKER_REGISTRATION_TOKEN)"))
+                        .addSecuritySchemes(
+                                WORKER_SECRET_SCHEME,
+                                new SecurityScheme()
+                                        .type(SecurityScheme.Type.HTTP)
+                                        .scheme("bearer")
+                                        .description("Per-worker secret returned by POST /internal/v1/workers/register")))
                 .addSecurityItem(new SecurityRequirement().addList(SESSION_SCHEME));
     }
 }

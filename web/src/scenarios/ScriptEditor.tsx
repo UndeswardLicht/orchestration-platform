@@ -4,7 +4,9 @@ import CodeMirror, { EditorView } from '@uiw/react-codemirror'
 import { useId, useMemo } from 'react'
 
 function contentAttributes(labelledBy: string, describedBy: string, invalid: boolean, readOnly: boolean) {
-  const attributes: Record<string, string> = { 'aria-labelledby': labelledBy }
+  // In the tab order even when read-only, so keyboard users can reach a long script and scroll it
+  // (WCAG 2.1.1; axe's scrollable-region-focusable rule does not count contenteditable as focusable).
+  const attributes: Record<string, string> = { 'aria-labelledby': labelledBy, tabindex: '0' }
   if (describedBy) attributes['aria-describedby'] = describedBy
   if (invalid) attributes['aria-invalid'] = 'true'
   if (readOnly) attributes['aria-readonly'] = 'true'

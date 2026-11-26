@@ -51,14 +51,45 @@ public class Worker {
     protected Worker() {}
 
     public Worker(String name, double cpus, int memMb, String version, String secretHash) {
+        this(name, cpus, memMb, version, secretHash, Instant.now());
+    }
+
+    public Worker(String name, double cpus, int memMb, String version, String secretHash, Instant now) {
         this.name = Objects.requireNonNull(name);
         this.cpus = cpus;
         this.memMb = memMb;
         this.version = Objects.requireNonNull(version);
         this.secretHash = Objects.requireNonNull(secretHash);
         this.status = WorkerStatus.ONLINE;
-        this.registeredAt = Instant.now();
-        this.lastHeartbeatAt = registeredAt;
+        this.registeredAt = Objects.requireNonNull(now);
+        this.lastHeartbeatAt = now;
+    }
+
+    /**
+     * The worker registered again under its name (restart): it reuses this record with a new secret, so
+     * the old secret stops working. The first registration time stays.
+     */
+    public void reRegister(double cpus, int memMb, String version, String secretHash, Instant now) {
+        this.cpus = cpus;
+        this.memMb = memMb;
+        this.version = Objects.requireNonNull(version);
+        this.secretHash = Objects.requireNonNull(secretHash);
+        this.status = WorkerStatus.ONLINE;
+        this.lastHeartbeatAt = Objects.requireNonNull(now);
+    }
+
+    /** A heartbeat: the worker is alive and reports ONLINE or BUSY. */
+    public void heartbeat(WorkerStatus reported, Instant now) {
+        if (reported != WorkerStatus.ONLINE && reported != WorkerStatus.BUSY) {
+            throw new IllegalArgumentException("A worker reports ONLINE or BUSY, not " + reported);
+        }
+        this.status = reported;
+        this.lastHeartbeatAt = Objects.requireNonNull(now);
+    }
+
+    /** The worker shut down cleanly. */
+    public void goOffline() {
+        this.status = WorkerStatus.OFFLINE;
     }
 
     public Long getId() {
