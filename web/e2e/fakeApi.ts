@@ -3,8 +3,8 @@ import type { Page } from '@playwright/test'
 /**
  * Fake Control Service answers for the e2e tests. CI runs these tests against the Vite dev server only,
  * with no backend, so every `/api` call is answered here in the browser. Sign-in, `me`, sign-out,
- * scenarios and their versions behave like the real endpoints; any other call gets 404, so a missing
- * fake shows up.
+ * scenarios and their versions behave like the real endpoints, and the worker list comes from the
+ * options; any other call gets 404, so a missing fake shows up.
  */
 export const ADMIN = { id: 1, login: 'admin', role: 'ADMIN' }
 
@@ -27,10 +27,37 @@ interface FakeScenario {
   versions: { version: number; script: string }[]
 }
 
+export interface FakeWorker {
+  id: number
+  name: string
+  status: 'ONLINE' | 'BUSY' | 'LOST' | 'OFFLINE'
+  cpus: number
+  memMb: number
+  version: string
+  lastHeartbeatAt: string
+  registeredAt: string
+}
+
 interface FakeApiOptions {
   signedIn: boolean
   /** Scenarios that exist from the start. */
   scenarios?: FakeScenarioInput[]
+  /** What GET /api/v1/workers answers; a function is asked on every call (the page refreshes every 2 s). */
+  workers?: FakeWorker[] | (() => FakeWorker[])
+}
+
+/** A worker as the Control Service lists it, with a heartbeat `secondsAgo` before now. */
+export function fakeWorker(id: number, name: string, status: FakeWorker['status'], secondsAgo = 1): FakeWorker {
+  return {
+    id,
+    name,
+    status,
+    cpus: 2,
+    memMb: 4096,
+    version: '0.1.0',
+    lastHeartbeatAt: new Date(Date.now() - secondsAgo * 1000).toISOString(),
+    registeredAt: '2026-11-27T08:00:00Z',
+  }
 }
 
 const CREATED_AT = '2026-11-26T09:30:00Z'
@@ -38,7 +65,7 @@ const CREATED_AT = '2026-11-26T09:30:00Z'
 /** Not a real SHA-256; the UI only shows it. */
 const fakeHash = (script: string) => [...script].reduce((hash, c) => (hash * 31 + c.charCodeAt(0)) >>> 0, 7).toString(16).padStart(64, '0')
 
-export async function fakeApi(page: Page, baseURL: string, { signedIn, scenarios = [] }: FakeApiOptions) {
+export async function fakeApi(page: Page, baseURL: string, { signedIn, scenarios = [], workers = [] }: FakeApiOptions) {
   let user: typeof ADMIN | null = signedIn ? ADMIN : null
   const saved: FakeScenario[] = scenarios.map(({ scripts, ...scenario }, index) => ({
     id: index + 1,
@@ -136,6 +163,8 @@ export async function fakeApi(page: Page, baseURL: string, { signedIn, scenarios
       case 'POST /api/v1/auth/logout':
         user = null
         return route.fulfill({ status: 204 })
+      case 'GET /api/v1/workers':
+        return route.fulfill({ json: typeof workers === 'function' ? workers() : workers })
       case 'GET /api/v1/scenarios':
         return route.fulfill({ json: [...saved].sort((a, b) => a.name.localeCompare(b.name)).map(summary) })
       case 'POST /api/v1/scenarios': {

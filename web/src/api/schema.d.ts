@@ -4,6 +4,66 @@
  */
 
 export interface paths {
+    "/internal/v1/workers/{id}/heartbeat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send a heartbeat
+         * @description Every 2 s. Updates the last heartbeat time (Control Service clock) and the status; a LOST or OFFLINE worker becomes ONLINE again. A worker without a heartbeat for more than 15 s is marked LOST. The answer carries commands for the worker (ASSIGN, CANCEL; from Sprint 2, empty until then). On 401 the worker registers again.
+         */
+        post: operations["heartbeat"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/v1/workers/{id}/deregister": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stop cleanly
+         * @description Called when the worker shuts down. It shows OFFLINE at once instead of LOST after the heartbeat timeout. A later heartbeat or registration makes it ONLINE again.
+         */
+        post: operations["deregister"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/v1/workers/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Register a worker
+         * @description Exchanges the shared registration token for a worker id and a per-worker secret, which every later call sends as `Authorization: Bearer <secret>`. The secret is returned only here; registering again (after a restart) gives a new one and the old one stops working. The worker is ONLINE at once.
+         */
+        post: operations["register"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/users": {
         parameters: {
             query?: never;
@@ -136,6 +196,26 @@ export interface paths {
         patch: operations["changeRole"];
         trace?: never;
     };
+    "/api/v1/workers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List workers
+         * @description Every registered worker with its status and last heartbeat, ordered by name. Statuses: ONLINE (free), BUSY (runs a segment), LOST (no heartbeat for more than 15 s), OFFLINE (stopped cleanly).
+         */
+        get: operations["list_2"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/scenarios/{id}": {
         parameters: {
             query?: never;
@@ -220,6 +300,86 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description The worker's own state */
+        HeartbeatRequest: {
+            /**
+             * @description ONLINE (free) or BUSY (runs a segment)
+             * @example ONLINE
+             * @enum {string}
+             */
+            status: "ONLINE" | "BUSY" | "LOST" | "OFFLINE" | "ONLINE" | "BUSY";
+            /**
+             * Format: int64
+             * @description Segment the worker runs (from Sprint 2)
+             */
+            activeSegment?: number | null;
+        };
+        Assign: components["schemas"]["Command"] & {
+            /** Format: int64 */
+            runId?: number;
+            /** Format: int64 */
+            segmentId?: number;
+            /** Format: int32 */
+            attempt?: number;
+            scriptRef?: string;
+            segment?: string;
+            sequence?: string;
+            k6Args?: string[];
+            env?: {
+                [key: string]: string;
+            };
+        };
+        Cancel: components["schemas"]["Command"] & {
+            /** Format: int64 */
+            segmentId?: number;
+        };
+        Command: Record<string, never>;
+        HeartbeatResponse: {
+            commands?: (components["schemas"]["Assign"] | components["schemas"]["Cancel"])[];
+        };
+        ProblemDetail: {
+            /** Format: uri */
+            type?: string;
+            title?: string;
+            /** Format: int32 */
+            status?: number;
+            detail?: string;
+            /** Format: uri */
+            instance?: string;
+            properties?: {
+                [key: string]: Record<string, never>;
+            };
+        };
+        /** @description Who the worker is and what it can use */
+        RegisterWorkerRequest: {
+            /**
+             * @description Unique worker name (the container host name by default). A known name reuses its record: a restarted worker keeps its id.
+             * @example worker-1
+             */
+            name: string;
+            /**
+             * @description Worker software version
+             * @example 0.1.0
+             */
+            version: string;
+            /**
+             * Format: int32
+             * @description CPUs the worker can use
+             * @example 2
+             */
+            cpus: number;
+            /**
+             * Format: int64
+             * @description Memory the worker can use, MB
+             * @example 4096
+             */
+            memMb: number;
+        };
+        RegisterResponse: {
+            /** Format: int64 */
+            workerId?: number;
+            workerSecret?: string;
+        };
         /** @description A new account */
         CreateUserRequest: {
             /**
@@ -261,19 +421,6 @@ export interface components {
              * @example 2026-11-25T09:30:00Z
              */
             createdAt?: string;
-        };
-        ProblemDetail: {
-            /** Format: uri */
-            type?: string;
-            title?: string;
-            /** Format: int32 */
-            status?: number;
-            detail?: string;
-            /** Format: uri */
-            instance?: string;
-            properties?: {
-                [key: string]: Record<string, never>;
-            };
         };
         /** @description A new scenario and the script of its version 1 */
         CreateScenarioRequest: {
@@ -413,6 +560,50 @@ export interface components {
              */
             role: "ADMIN" | "DEVELOPER" | "VIEWER";
         };
+        /** @description A registered worker and its status */
+        WorkerSummary: {
+            /**
+             * Format: int64
+             * @example 3
+             */
+            id: number;
+            /** @example worker-1 */
+            name: string;
+            /**
+             * @description ONLINE: free; BUSY: runs a segment; LOST: no heartbeat for more than 15 s; OFFLINE: stopped cleanly
+             * @example ONLINE
+             * @enum {string}
+             */
+            status: "ONLINE" | "BUSY" | "LOST" | "OFFLINE";
+            /**
+             * Format: double
+             * @description CPUs the worker can use
+             * @example 2
+             */
+            cpus: number;
+            /**
+             * Format: int32
+             * @description Memory the worker can use, MB
+             * @example 4096
+             */
+            memMb: number;
+            /**
+             * @description Worker software version
+             * @example 0.1.0
+             */
+            version: string;
+            /**
+             * Format: date-time
+             * @example 2026-11-27T10:15:02Z
+             */
+            lastHeartbeatAt: string;
+            /**
+             * Format: date-time
+             * @description First registration
+             * @example 2026-11-27T08:00:00Z
+             */
+            registeredAt: string;
+        };
         /** @description A scenario with its newest version */
         ScenarioDetails: {
             /**
@@ -460,8 +651,8 @@ export interface components {
             createdAt: string;
         };
         CsrfToken: {
-            headerName?: string;
             token?: string;
+            headerName?: string;
             parameterName?: string;
         };
     };
@@ -473,6 +664,203 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    heartbeat: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @example 3 */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HeartbeatRequest"];
+            };
+        };
+        responses: {
+            /** @description Heartbeat recorded */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "commands": []
+                     *     }
+                     */
+                    "*/*": components["schemas"]["HeartbeatResponse"];
+                };
+            };
+            /** @description Missing, unknown or replaced secret */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "type": "about:blank",
+                     *       "title": "Unauthorized",
+                     *       "status": 401,
+                     *       "detail": "Missing, unknown or replaced worker secret. Register again.",
+                     *       "instance": "/internal/v1/workers/3/heartbeat"
+                     *     }
+                     */
+                    "*/*": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description The secret belongs to another worker */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "type": "about:blank",
+                     *       "title": "Forbidden",
+                     *       "status": 403,
+                     *       "detail": "This secret belongs to worker 4, not 3",
+                     *       "instance": "/internal/v1/workers/3/heartbeat"
+                     *     }
+                     */
+                    "*/*": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    deregister: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @example 3 */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The worker is OFFLINE */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing, unknown or replaced secret */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "type": "about:blank",
+                     *       "title": "Unauthorized",
+                     *       "status": 401,
+                     *       "detail": "Missing, unknown or replaced worker secret. Register again.",
+                     *       "instance": "/internal/v1/workers/3/heartbeat"
+                     *     }
+                     */
+                    "*/*": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description The secret belongs to another worker */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "type": "about:blank",
+                     *       "title": "Forbidden",
+                     *       "status": 403,
+                     *       "detail": "This secret belongs to worker 4, not 3",
+                     *       "instance": "/internal/v1/workers/3/heartbeat"
+                     *     }
+                     */
+                    "*/*": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
+    register: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterWorkerRequest"];
+            };
+        };
+        responses: {
+            /** @description Registered */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "workerId": 3,
+                     *       "workerSecret": "q8V1o2m3J5f4pYbW0wK9xZt7sLr6cNd2eHgUaQiE1Ok"
+                     *     }
+                     */
+                    "*/*": components["schemas"]["RegisterResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "type": "about:blank",
+                     *       "title": "Bad Request",
+                     *       "status": 400,
+                     *       "detail": "Validation failed",
+                     *       "instance": "/internal/v1/workers/register",
+                     *       "errors": [
+                     *         {
+                     *           "field": "cpus",
+                     *           "message": "must be greater than or equal to 1"
+                     *         }
+                     *       ]
+                     *     }
+                     */
+                    "*/*": components["schemas"]["ProblemDetail"];
+                };
+            };
+            /** @description Missing or wrong registration token; no worker is created */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "type": "about:blank",
+                     *       "title": "Unauthorized",
+                     *       "status": 401,
+                     *       "detail": "Missing or wrong registration token in the X-Registration-Token header.",
+                     *       "instance": "/internal/v1/workers/register"
+                     *     }
+                     */
+                    "*/*": components["schemas"]["ProblemDetail"];
+                };
+            };
+        };
+    };
     list: {
         parameters: {
             query?: never;
@@ -1050,6 +1438,50 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    list_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Workers */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example [
+                     *       {
+                     *         "id": 3,
+                     *         "name": "worker-1",
+                     *         "status": "ONLINE",
+                     *         "cpus": 2,
+                     *         "memMb": 4096,
+                     *         "version": "0.1.0",
+                     *         "lastHeartbeatAt": "2026-11-27T10:15:02Z",
+                     *         "registeredAt": "2026-11-27T08:00:00Z"
+                     *       },
+                     *       {
+                     *         "id": 4,
+                     *         "name": "worker-2",
+                     *         "status": "LOST",
+                     *         "cpus": 2,
+                     *         "memMb": 4096,
+                     *         "version": "0.1.0",
+                     *         "lastHeartbeatAt": "2026-11-27T10:12:40Z",
+                     *         "registeredAt": "2026-11-27T08:00:01Z"
+                     *       }
+                     *     ]
+                     */
+                    "*/*": components["schemas"]["WorkerSummary"][];
+                };
             };
         };
     };

@@ -20,6 +20,7 @@ ltp:
     control-url: ${LTP_CONTROL_URL:http://localhost:8080}
     registration-token: ${LTP_WORKER_REGISTRATION_TOKEN:change-me}
     name: ${LTP_WORKER_NAME:${HOSTNAME:worker-local}}
+    version: ${LTP_VERSION:@project.version@}
     # Filtered from the parent POM property k6.image
     k6-image: ${LTP_K6_IMAGE:@k6.image@}
     io-volume: ${LTP_K6_IO_VOLUME:ltp-k6-io}

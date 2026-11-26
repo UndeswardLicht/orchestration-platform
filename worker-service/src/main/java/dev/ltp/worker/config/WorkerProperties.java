@@ -13,7 +13,8 @@ import org.springframework.validation.annotation.Validated;
  *
  * @param controlUrl base URL of the Control Service
  * @param registrationToken shared token from {@code .env}, exchanged for a per-worker secret
- * @param name worker name shown in the UI
+ * @param name worker name shown in the UI; a restarted worker with the same name keeps its record
+ * @param version worker software version, sent on registration
  * @param k6Image pinned k6 image (risk R8)
  * @param ioVolume mount source shared by the worker and k6 containers (scripts + JSON output): a
  *     named Docker volume, or an absolute host path (bind mount, used by tests)
@@ -29,6 +30,7 @@ public record WorkerProperties(
         @NotNull URI controlUrl,
         @NotBlank String registrationToken,
         @NotBlank String name,
+        @NotBlank String version,
         @NotBlank String k6Image,
         @NotBlank String ioVolume,
         @NotBlank String ioDir,

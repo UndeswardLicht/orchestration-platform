@@ -52,6 +52,17 @@ describe('ScenarioPage', () => {
     expect(editor).toHaveAttribute('aria-readonly', 'true')
   })
 
+  // NFR-08: a long read-only script must be reachable by keyboard to scroll it
+  it('lets keyboard users reach the read-only script with Tab', async () => {
+    signedInAs(VIEWER, ONE_VERSION)
+    renderRoute('/scenarios/12')
+    const script = await screen.findByRole('textbox', { name: 'Script of version 1' })
+
+    const user = userEvent.setup()
+    for (let presses = 0; presses < 20 && document.activeElement !== script; presses++) await user.tab()
+    expect(script).toHaveFocus()
+  })
+
   // US-02 acceptance criterion, in the UI: version 1 stays selectable after version 2 exists
   it('lets the user pick version 1 after version 2 was saved', async () => {
     signedInAs(VIEWER, TWO_VERSIONS)
