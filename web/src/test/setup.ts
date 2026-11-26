@@ -1,9 +1,12 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
-import { afterEach } from 'vitest'
+import { afterEach, vi } from 'vitest'
+import { clearCookies } from './fakeApi.ts'
 
 afterEach(() => {
   cleanup()
+  vi.unstubAllGlobals()
+  clearCookies()
 })
 
 // jsdom lacks these browser APIs; Mantine needs them

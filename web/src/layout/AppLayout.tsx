@@ -1,6 +1,7 @@
-import { AppShell, Burger, Group, NavLink, Title } from '@mantine/core'
+import { AppShell, Badge, Burger, Button, Group, NavLink, Text, Title } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
 import { NavLink as RouterNavLink, Outlet } from 'react-router'
+import { useCurrentUser, useSignOut } from '../auth/session.ts'
 
 const NAV_ITEMS = [
   { to: '/scenarios', label: 'Scenarios' },
@@ -8,9 +9,14 @@ const NAV_ITEMS = [
   { to: '/workers', label: 'Workers' },
 ]
 
-/** Responsive shell: navbar collapses behind a burger below the `sm` breakpoint (US-25, NFR-08). */
+/**
+ * Responsive shell: navbar collapses behind a burger below the `sm` breakpoint (US-25, NFR-08).
+ * Shown only to signed-in users (`RequireAuth`); the header names the user and role.
+ */
 export function AppLayout() {
   const [opened, { toggle, close }] = useDisclosure()
+  const { data: user } = useCurrentUser()
+  const signOut = useSignOut()
 
   return (
     <AppShell
@@ -24,6 +30,21 @@ export function AppLayout() {
           <Title order={1} size="h4">
             LTP
           </Title>
+          <Group gap="sm" ml="auto" wrap="nowrap">
+            {user && (
+              <Group gap={6} wrap="nowrap" visibleFrom="xs">
+                <Text size="sm" fw={500} truncate maw={160}>
+                  {user.login}
+                </Text>
+                <Badge variant="light" size="sm">
+                  {user.role}
+                </Badge>
+              </Group>
+            )}
+            <Button variant="default" size="xs" onClick={() => signOut.mutate()} loading={signOut.isPending}>
+              Sign out
+            </Button>
+          </Group>
         </Group>
       </AppShell.Header>
 
